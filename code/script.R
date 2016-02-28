@@ -1,6 +1,7 @@
 # Making a beetle-of-the-day twitter bot
 rm(list = ls())
-# Functions
+# Working directories
+wd <- "~/GitHub/beetleBot"
 
 #Libraries
 library(httr)
@@ -9,7 +10,7 @@ library(ROAuth)
 library(XML)
 
 # Accessing Twitter
-tokens <- read.csv("C:/Users/klevan/Desktop/my stuff/twitterBOT/tokens.txt", sep="", stringsAsFactors=FALSE)
+tokens <- read.csv(paste(wd,"data/tokens.txt",sep="/"), sep="", stringsAsFactors=FALSE)
 api_key <- tokens$tokens[1]
 api_secret <- tokens$tokens[2]
 access_token <- tokens$tokens[3]
@@ -30,6 +31,35 @@ if(nchar(life$beetle_photo[grepl(beetle_name,life$scientificName)])>0){
 }
 
 # Determine known facts
+# From the Ecology section
+traits <- c("epigean", "eurytopic", "fossorial", "gregarious", "halophilous", "heliophilous", "hygrophilous",
+            "myrmecophilous", "pholeophilous", "psammophilous", "semi-gregarious", "silvicolous", 
+            "solitary","stenotopic", "steppicolous", "thermophilous", "xerophilous")
+
+life$traits <- NA
+for (i in 1:dim(life)[1]){
+  # Known associated species
+  if (length(strsplit(life$Ecology[i],split = "Associated species:")[[1]])==2){
+    life$associates[i] <- strsplit(life$Ecology[i],split = "Associated species:")[[1]][2]
+    life$associates[i] <- gsub(pattern = ", and ", replacement = ", ", x = life$associates[i])
+    life$associates[i] <- gsub(pattern = " and ", replacement = ", ", x = life$associates[i])
+  } else {
+    life$associates[i] <- NA
+  }
+  
+  # traits
+  for (j in traits){
+    if(grepl(j, life$Ecology[i], ignore.case = TRUE)){
+      if(is.na(life$traits[i])==TRUE){
+        life$traits[i] <- j
+      } else {
+        life$traits[i] <- paste(life$traits[i], j,sep=",") 
+      }
+    } 
+  }
+}
+
+# Collate known facts
 # 1. Find dispersal information about the beetle
 dispersal <- strsplit(life$Dispersal[match(beetle_name,life$scientificName)],
                       split="\\. ")[[1]][sample(1:length(strsplit(life$Dispersal
@@ -84,10 +114,19 @@ preys_on <- strsplit(life$prey[match(beetle_name,life$scientificName)],
 most_vulnerable <- strsplit(strsplit(life$Biology[match(beetle_name,
                                                         life$scientificName)],split="Tenerals: ")[[1]][2],split = "\\. ")[[1]][1]
 
+# 10. Associated species
+associates <- strsplit(life$associates[match(beetle_name,life$scientificName)],
+                       split=",")[[1]][sample(1:length(strsplit(life$associates
+                                                                [match(beetle_name,life$scientificName)],split=", ")[[1]]),1)]
+# 11. Traits
+trait <- strsplit(life$traits[match(beetle_name,life$scientificName)],
+                  split=",")[[1]][sample(1:length(strsplit(life$traits
+                                                           [match(beetle_name,life$scientificName)],split=", ")[[1]]),1)]
+
 # Choose one of the facts, but don't pick categories where info is unknown or non-existent
 facts <- c(can_fly,conservation_status,dayOrNight,dispersal,predatory,
-           preys_on,prey_of,most_vulnerable,seasonal)
-random_fact <- sample(facts[is.na(facts)==FALSE & tolower(facts)!="unknown"],1); rm(facts)
+           preys_on,prey_of,most_vulnerable,seasonal,associates,trait)
+random_fact <- sample(facts[is.na(facts)==FALSE & tolower(facts)!="unknown"],1); rm(facts,traits)
 
 # An intro phrase
 intro_phrase <- c("Wow! Did you know that","Didn't know that","Just learned that",
@@ -135,6 +174,113 @@ if(random_fact%in%prey_of){
                            "get panicked around","get the jitters around")
   transitional_phrase <- sample(transitional_phrase,1)  
   random_fact <- paste(c(transitional_phrase,tolower(random_fact)),collapse = " ")
+}
+
+if(random_fact%in%associates){
+  transitional_phrase <- c("are known associates of","are often found with","turn up near","are closely aligned with",
+                           "are fast friends of","co-occur with","run in with","associates with")
+  transitional_phrase <- sample(transitional_phrase,1)  
+  random_fact <- paste(c(transitional_phrase,tolower(random_fact)),collapse = " ")
+}
+if(random_fact%in%trait){
+  transitional_phrase <- "is"  
+  random_fact <- paste(c(transitional_phrase,tolower(random_fact)),collapse = " ")
+  if(trait=="epigean"){
+    extra <- c("lives aboveground", "a surface-dweller")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="eurytopic"){
+    extra <- c("lives anywhere", "the world's their oyster",
+               "tolerates changing habitats","location/habitat: flexible")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="fossorial"){
+    extra <- c("digs a burrow", "likes burrowing",
+               "burrows","digs burrows")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="gregarious"){
+    extra <- c("enjoys the company of others", "buddies with conspecifics")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="halophilous"){
+    extra <- c("enjoys the salt of the earth", "a salt-lover",
+               "loves salt-flats","tolerates salt pretty well")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="heliophilous"){
+    extra <- c("loves the sun", "loves sunshine",
+               "loves sunny days", "loves warm, sunny climes")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="hygrophilous"){
+    extra <- c("a fan of water", "loves the damp",
+               "is a fan of moisture","lives near the water",
+               "probably lives near water")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="myrmecophilous"){
+    extra <- c("loves ants", "an ant-fanatic",
+               "is a fan of ants","lives near ants",
+               "probably found near ants")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="pholeophilous"){
+    extra <- c("a fan of shade", "loves the dark",
+               "is a fan of the dark","lives in the shade",
+               "probably lives in shade")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="psammophilous"){
+    extra <- c("a fan of sand", "loves sandy habitats",
+               "enjoys windblown sandy habitats","could probably tolerate a beach")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="silvicolous"){
+    extra <- c("a fan of forests", "loves forests",
+               "lives near large trees",
+               "probably lives in a conifer forest")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="solitary"){
+    extra <- c("a loner", "doesn't play well with others")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="stenotopic"){
+    extra <- c("sensitive to habitat change", "can't live in new places",
+               "has a restricted habitat range")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="steppicolous"){
+    extra <- c("lives in steppes", "lives in grasslands")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="thermophilous"){
+    extra <- c("lives for the heat", "loves hot conditions",
+               "thrives in hot environs")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
+  if(trait=="xerophilous"){
+    extra <- c("loves dry habitats", "not a big fan of water",
+               "a fan of dry habitats")
+    extra <- sample(extra,1)
+    random_fact <- paste0(random_fact,"(",extra,")")
+  }
 }
 
 # Adjectives and nouns for a secondary sentence
